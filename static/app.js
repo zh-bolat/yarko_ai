@@ -427,7 +427,7 @@
                 state.simHistory.push({ role: "bot", text: res.draft_reply });
                 renderSimChat();
             }
-            
+            els.simCardContent.classList.remove("sim-card-empty");
             els.simCardContent.innerHTML = buildCardHTML(res);
             if (window.lucide) window.lucide.createIcons();
             
@@ -460,11 +460,10 @@
     function handleSimReset() {
         state.simHistory = [];
         renderSimChat();
+        els.simCardContent.classList.add("sim-card-empty");
         els.simCardContent.innerHTML = `
-            <div class="sim-card-empty">
-                <i data-lucide="layout-template"></i>
-                <p>Карточка сформируется после первого сообщения</p>
-            </div>
+            <i data-lucide="layout-template"></i>
+            <p>Карточка сформируется после первого сообщения</p>
         `;
         if (window.lucide) window.lucide.createIcons();
     }
@@ -521,8 +520,9 @@
         const confidenceColor = confidencePct >= 80 ? "var(--intent-tour)" : confidencePct >= 50 ? "#facc15" : "var(--intent-urgent)";
 
         let html = `
-            <div class="intent-header">
-                <span class="intent-badge ${conf.class}">
+            <div class="card-view">
+                <div class="intent-header">
+                    <span class="intent-badge ${conf.class}">
                     <i data-lucide="${conf.icon}"></i> ${conf.label}
                 </span>
                 <div class="confidence-container">
@@ -580,6 +580,7 @@
             `;
         }
 
+        html += '</div>'; // close .card-view
         return html;
     }
 
@@ -593,10 +594,7 @@
             html += `
                 <div class="batch-item" style="animation-delay:${i * 0.05}s">
                     <div class="batch-item-header">
-                        <span class="batch-item-number">#${i + 1}</span>
-                        <span class="intent-badge ${intentConf.class}" style="font-size:0.75rem;padding:4px 10px">
-                            <i data-lucide="${intentConf.icon}"></i> ${r.intent}
-                        </span>
+                        <span class="batch-item-number">Заявка #${i + 1}</span>
                     </div>
                     ${buildCardHTML(r)}
                 </div>
