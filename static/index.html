@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="description" content="AI-автоматизатор разбора сообщений туристов">
+    <meta name="theme-color" content="#FFFFFF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <title>Yarko AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <!-- Экран авторизации -->
+    <div id="auth-screen" class="screen auth-screen">
+        <div class="auth-card">
+            <div class="hero-badge">
+                <span class="hero-badge-dot"></span>
+                <span>Security</span>
+            </div>
+            <h1 class="hero-title">Welcome back</h1>
+            <p class="subtitle">Please enter your password to continue</p>
+            
+            <div class="auth-form">
+                <input 
+                    type="password" 
+                    id="auth-password" 
+                    class="input auth-input" 
+                    placeholder="Enter password..."
+                    autocomplete="current-password"
+                >
+                <button id="auth-btn" class="btn btn-primary">
+                    Continue
+                </button>
+                <p id="auth-error" class="error-text hidden">
+                    Incorrect password.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Основной экран -->
+    <div id="main-screen" class="screen hidden">
+        <!-- Хедер -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="header-logo">
+                        <i data-lucide="sparkles"></i>
+                    </div>
+                    <span class="header-title">Yarko AI</span>
+                </div>
+                <div class="header-right">
+                    <button id="mode-toggle" class="btn-icon" title="Toggle Batch Mode">
+                        <i data-lucide="layers" id="mode-icon"></i>
+                    </button>
+                    <button id="export-btn" class="btn-icon" title="Export Data">
+                        <i data-lucide="download"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Контент -->
+        <main class="main-content">
+            <!-- Hero секция -->
+            <section class="hero-section">
+                <div class="hero-badge">
+                    <span class="hero-badge-dot"></span>
+                    <span>AI Assistant</span>
+                </div>
+                <h1 class="hero-title">Analyze messages <br/>in seconds.</h1>
+            </section>
+
+            <!-- Ввод сообщения -->
+            <section class="input-section">
+                <div class="card">
+                    <div class="input-header">
+                        <h2 id="input-title">Message input</h2>
+                        <div class="mode-switch">
+                            <span class="switch-label">Batch mode</span>
+                            <label class="switch">
+                                <input type="checkbox" id="batch-mode-toggle">
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <textarea 
+                        id="message-input" 
+                        class="textarea" 
+                        placeholder="Paste user message here..."
+                        rows="4"
+                    ></textarea>
+                    <p id="batch-hint" class="hint hidden">
+                        <i data-lucide="info"></i>
+                        Separate multiple messages with <code>---</code>
+                    </p>
+                    <div class="input-actions">
+                        <button id="analyze-btn" class="btn btn-primary">
+                            <span class="btn-text">Analyze message</span>
+                            <span class="btn-loading hidden">
+                                <i data-lucide="loader-2" class="spinner-icon"></i> Processing...
+                            </span>
+                        </button>
+                        <button id="clear-btn" class="btn btn-ghost" title="Clear input">
+                            <i data-lucide="trash-2"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Результат -->
+            <section id="result-section" class="result-section hidden">
+                <div class="card">
+                    
+                    <!-- Segmented Control (Tabs) -->
+                    <div class="segment-control-wrapper">
+                        <div class="segment-control">
+                            <button class="segment-btn active" data-target="card-view">
+                                <i data-lucide="layout-template"></i> Красивая карточка
+                            </button>
+                            <button class="segment-btn" data-target="json-view">
+                                <i data-lucide="file-json-2"></i> Сырой JSON
+                            </button>
+                            <div class="segment-indicator"></div>
+                        </div>
+                        <button id="copy-btn" class="btn-icon btn-icon-small" title="Copy Result">
+                            <i data-lucide="copy"></i>
+                        </button>
+                    </div>
+
+                    <div class="result-body">
+                        <!-- Вид: карточка -->
+                        <div id="card-view" class="tab-content active">
+                            <!-- Заполняется из JS -->
+                        </div>
+
+                        <!-- Вид: JSON -->
+                        <div id="json-view" class="tab-content json-wrapper">
+                            <pre><code id="json-output"></code></pre>
+                        </div>
+                    </div>
+
+                    <!-- Стоимость -->
+                    <div class="cost-bar">
+                        <div class="cost-left">
+                            <span class="cost-label">Cost:</span>
+                            <span id="cost-value" class="cost-value">₽0.00</span>
+                        </div>
+                        <span class="cost-tokens" id="cost-tokens"></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Batch результаты -->
+            <section id="batch-result-section" class="result-section hidden">
+                <div class="card">
+                    <div class="result-header">
+                        <h2>Batch Results</h2>
+                        <div class="result-actions">
+                            <button id="batch-copy-btn" class="btn-icon" title="Copy All">
+                                <i data-lucide="copy"></i>
+                            </button>
+                            <button id="batch-csv-btn" class="btn-icon" title="Download CSV">
+                                <i data-lucide="file-spreadsheet"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="batch-results" class="batch-results">
+                        <!-- Заполняется из JS -->
+                    </div>
+                    <div class="cost-bar">
+                        <div class="cost-left">
+                            <span class="cost-label">Total Cost:</span>
+                            <span id="batch-cost-value" class="cost-value">₽0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- История -->
+            <section id="history-section" class="history-section hidden">
+                <div class="card">
+                    <div class="result-header">
+                        <h2>Recent History</h2>
+                        <button id="clear-history-btn" class="btn-icon" title="Clear History">
+                            <i data-lucide="trash-2"></i>
+                        </button>
+                    </div>
+                    <div id="history-list" class="history-list">
+                        <!-- Заполняется из JS -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Уведомления -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/app.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
