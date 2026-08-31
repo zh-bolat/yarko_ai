@@ -139,23 +139,40 @@ async def _process_ready(
 ) -> None:
     """
     Вызывается когда буфер готов к обработке.
-    Разбирает склеенное сообщение и отправляет результат.
+    Ведет живой диалог или выдает JSON по команде.
     """
     try:
-        # Разбираем сообщение
-        result = await gemini_client.analyze_message(merged_text)
-
-        # Если спам — не отвечаем
-        if result.intent == "спам":
-            logger.info(f"Spam detected for user {user_id}, ignoring")
+        # Если клиент запросил JSON (кодовое слово)
+        if merged_text.strip().lower() == "json":
+            # Формируем полный текст истории для разбора
+            history_text = gemini_client._format_context(dialog_history)
+            
+            # Отправляем ВСЮ историю на разбор (как единый текст)
+            result = await gemini_client.analyze_message(history_text)
+            
+            # 1. Отправляем красивую карточку
+            reply = _format_result(result)
+            await update.message.reply_text(reply, parse_mode="HTML")
+            
+            # 2. Отправляем сырой JSON
+            raw_json = result.model_dump_json(indent=2)
+            await update.message.reply_text(f"<pre>{raw_json}</pre>", parse_mode="HTML")
+            
+            # Очищаем историю после выгрузки, чтобы начать с чистого листа
+            context_manager.clear_history(user_id)
             return
 
-        # Форматируем и отправляем ответ
-        reply = _format_result(result)
-        await update.message.reply_text(reply, parse_mode="HTML")
-
-        # Сохраняем ответ в историю
-        context_manager.add_bot_reply(user_id, reply)
+        # Иначе — ведем живой диалог с помощью AI
+        reply_text = await gemini_client.generate_dialog_reply(merged_text, dialog_history)
+        
+        # Если спам или пустой ответ — игнорируем
+        if not reply_text or not reply_text.strip():
+            return
+            
+        await update.message.reply_text(reply_text)
+        
+        # Сохраняем ответ ИИ в историю
+        context_manager.add_bot_reply(user_id, reply_text)
 
     except Exception as e:
         logger.error(f"Error processing message for user {user_id}: {e}")

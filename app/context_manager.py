@@ -164,6 +164,15 @@ class ContextManager:
             return []
         return buffer.dialog_history
 
+    def clear_history(self, user_id: int) -> None:
+        """Очищает историю диалога пользователя."""
+        buffer = self._buffers.get(user_id)
+        if buffer:
+            buffer.dialog_history.clear()
+            # Обновляем created_at, чтобы начать сессию заново
+            import time
+            buffer.created_at = time.time()
+
     def add_bot_reply(self, user_id: int, text: str) -> None:
         """Добавляет ответ бота в историю диалога."""
         buffer = self._buffers.get(user_id)

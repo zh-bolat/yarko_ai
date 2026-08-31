@@ -31,7 +31,7 @@ class Settings:
     RATE_LIMIT_GLOBAL_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_GLOBAL_PER_MINUTE", "100"))
 
     # Контекст-менеджер (склейка сообщений Telegram)
-    MESSAGE_BUFFER_TIMEOUT_SEC: int = int(os.getenv("MESSAGE_BUFFER_TIMEOUT_SEC", "10"))
+    MESSAGE_BUFFER_TIMEOUT_SEC: int = int(os.getenv("MESSAGE_BUFFER_TIMEOUT_SEC", "15"))
     MESSAGE_BUFFER_MAX_MESSAGES: int = int(os.getenv("MESSAGE_BUFFER_MAX_MESSAGES", "10"))
     MESSAGE_BUFFER_TTL_SEC: int = int(os.getenv("MESSAGE_BUFFER_TTL_SEC", "3600"))
 
