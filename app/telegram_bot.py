@@ -170,8 +170,9 @@ def _format_result(result: AnalyzeResponse) -> str:
         "спам": "🚫",
     }
 
-    icon = intent_icons.get(result.intent, "📋")
-    lines = [f"{icon} <b>{result.intent.replace('_', ' ').title()}</b>"]
+    intent_str = result.intent.value if hasattr(result.intent, "value") else str(result.intent)
+    icon = intent_icons.get(intent_str, "📋")
+    lines = [f"{icon} <b>{intent_str.replace('_', ' ').title()}</b>"]
     lines.append("")
 
     if result.people_count:
