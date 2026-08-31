@@ -148,7 +148,7 @@ class ContextManager:
 
         # Очищаем сообщения, но сохраняем историю
         buffer.messages.clear()
-        buffer.cancel_timer()
+        buffer.timer_task = None
 
         logger.info(
             f"Processing buffer for user {user_id}: "
