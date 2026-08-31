@@ -68,6 +68,9 @@ async def lifespan(app: FastAPI):
         try:
             from app.telegram_bot import init_telegram_bot
             _telegram_app = await init_telegram_bot()
+            if _telegram_app:
+                await _telegram_app.initialize()
+                await _telegram_app.start()
         except Exception as e:
             logger.warning(f"Telegram bot init failed: {e}")
     else:
@@ -81,6 +84,9 @@ async def lifespan(app: FastAPI):
     yield
 
     logger.info("👋 Shutting down Yarko AI...")
+    if _telegram_app:
+        await _telegram_app.stop()
+        await _telegram_app.shutdown()
 
 
 # ──────────────────────────────────────────────
