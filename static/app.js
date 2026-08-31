@@ -13,10 +13,11 @@
     const state = {
         token: localStorage.getItem("yarko_token") || null,
         history: JSON.parse(localStorage.getItem("yarko_history") || "[]"),
-        batchMode: false,
+        mode: "single", // "single", "batch", "simulator"
         jsonView: false,
         lastResult: null,
         lastBatchResults: null,
+        simHistory: [], // array of {role: 'user'|'bot', text: string}
     };
 
     // ──────────────────────────────────────────
@@ -33,18 +34,32 @@
         authBtn: $("#auth-btn"),
         authError: $("#auth-error"),
 
+        globalTabs: $$(".global-tab"),
+        mobileModeSelect: $("#mobile-mode-select"),
+        simMobileTabs: $$(".sim-mobile-tab"),
+        simChatPanel: $(".simulator-chat"),
+        simResultPanel: $(".simulator-result"),
+        
+        standardModeSection: $("#standard-mode-section"),
+        simulatorModeSection: $("#simulator-mode-section"),
+        historySection: $("#history-section"),
+        
+        innerTabs: $$(".inner-tab"),
+        tabInput: $("#tab-input"),
+        tabResult: $("#tab-result"),
+        tabBtnResult: $("#tab-btn-result"),
+        backToInputBtn: $("#back-to-input-btn"),
+
         messageInput: $("#message-input"),
         analyzeBtn: $("#analyze-btn"),
         clearBtn: $("#clear-btn"),
         btnText: $(".btn-text"),
         btnLoading: $(".btn-loading"),
-
-        batchModeToggle: $("#batch-mode-toggle"),
         batchHint: $("#batch-hint"),
-        inputTitle: $("#input-title"),
 
-        resultSection: $("#result-section"),
-        batchResultSection: $("#batch-result-section"),
+        // Results
+        singleResultContainer: $("#single-result-container"),
+        batchResultContainer: $("#batch-result-container"),
         cardView: $("#card-view"),
         jsonView: $("#json-view"),
         jsonOutput: $("#json-output"),
@@ -58,12 +73,22 @@
         batchCopyBtn: $("#batch-copy-btn"),
         batchCsvBtn: $("#batch-csv-btn"),
         batchCostValue: $("#batch-cost-value"),
+        batchSegmentBtns: $$(".batch-segment-btn"),
+        batchCardView: $("#batch-card-view"),
+        batchJsonView: $("#batch-json-view"),
+        batchJsonOutput: $("#batch-json-output"),
 
-        historySection: $("#history-section"),
         historyList: $("#history-list"),
         clearHistoryBtn: $("#clear-history-btn"),
 
-        exportBtn: $("#export-btn"),
+        // Simulator
+        simMessages: $("#sim-messages"),
+        simInput: $("#sim-input"),
+        simSendBtn: $("#sim-send-btn"),
+        simResetBtn: $("#sim-reset-btn"),
+        simCardContent: $("#sim-card-content"),
+        simLoading: $("#sim-loading"),
+
         toastContainer: $("#toast-container"),
     };
 
@@ -72,16 +97,75 @@
     // ──────────────────────────────────────────
 
     function init() {
-        // Check if already authenticated
-        if (state.token) {
-            showMainScreen();
-        }
+        if (state.token) showMainScreen();
 
-        // Auth
         els.authBtn.addEventListener("click", handleAuth);
         els.authPassword.addEventListener("keydown", (e) => {
             if (e.key === "Enter") handleAuth();
         });
+
+        // Global Modes
+        els.globalTabs.forEach(tab => {
+            tab.addEventListener("click", () => switchMode(tab.dataset.mode));
+        });
+
+        // Inner Tabs
+        els.innerTabs.forEach(tab => {
+            tab.addEventListener("click", () => {
+                if (!tab.disabled) switchInnerTab(tab.dataset.tab);
+            });
+        });
+
+        els.backToInputBtn.addEventListener("click", () => switchInnerTab("input"));
+        
+        // Mobile Mode Select
+        if (els.mobileModeSelect) {
+            els.mobileModeSelect.addEventListener("change", (e) => switchMode(e.target.value));
+        }
+
+        // Simulator Mobile Tabs
+        if (els.simMobileTabs) {
+            els.simMobileTabs.forEach(tab => {
+                tab.addEventListener("click", () => {
+                    els.simMobileTabs.forEach(t => t.classList.remove("active"));
+                    tab.classList.add("active");
+                    
+                    if (tab.dataset.tab === "chat") {
+                        els.simChatPanel.classList.remove("hidden-mobile");
+                        els.simResultPanel.classList.add("hidden-mobile");
+                    } else {
+                        els.simChatPanel.classList.add("hidden-mobile");
+                        els.simResultPanel.classList.remove("hidden-mobile");
+                    }
+                });
+            });
+            if (els.simResultPanel) els.simResultPanel.classList.add("hidden-mobile");
+        }
+
+        // Batch Segmented Control
+        if (els.batchSegmentBtns) {
+            els.batchSegmentBtns.forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const target = btn.dataset.target;
+                    els.batchSegmentBtns.forEach(b => b.classList.remove("active"));
+                    btn.classList.add("active");
+                    
+                    if (target === "batch-json-view") {
+                        els.batchCardView.classList.remove("active");
+                        els.batchJsonView.classList.add("active");
+                        
+                        const indicator = btn.closest(".segment-control").querySelector(".segment-indicator");
+                        if (indicator) indicator.style.transform = `translateX(100%)`;
+                    } else {
+                        els.batchCardView.classList.add("active");
+                        els.batchJsonView.classList.remove("active");
+                        
+                        const indicator = btn.closest(".segment-control").querySelector(".segment-indicator");
+                        if (indicator) indicator.style.transform = `translateX(0)`;
+                    }
+                });
+            });
+        }
 
         // Analyze
         els.analyzeBtn.addEventListener("click", handleAnalyze);
@@ -90,31 +174,13 @@
             els.messageInput.focus();
         });
 
-        // Batch mode toggle
-        els.batchModeToggle.addEventListener("change", (e) => {
-            state.batchMode = e.target.checked;
-            els.batchHint.classList.toggle("hidden", !state.batchMode);
-            
-            if (state.batchMode) {
-                els.inputTitle.innerHTML = '<i data-lucide="layers"></i> Несколько заявок';
-                els.messageInput.placeholder = "Вставьте список сообщений (система разделит их автоматически)";
-            } else {
-                els.inputTitle.innerHTML = '<i data-lucide="user"></i> Сообщение туриста';
-                els.messageInput.placeholder = "Вставьте сообщение туриста...";
-            }
-            if (window.lucide) window.lucide.createIcons();
-        });
-
         // Segmented Control (card / JSON)
         els.segmentBtns.forEach(btn => {
             btn.addEventListener("click", () => {
                 const target = btn.dataset.target;
-                
-                // Update UI state
                 els.segmentBtns.forEach(b => b.classList.remove("active"));
                 btn.classList.add("active");
                 
-                // Update indicator position
                 if (target === "json-view") {
                     els.segmentControl.dataset.active = "json";
                     state.jsonView = true;
@@ -137,36 +203,18 @@
             }
         });
 
-        // Batch copy
+        // Batch copy/CSV
         els.batchCopyBtn.addEventListener("click", () => {
             if (state.lastBatchResults) {
                 copyToClipboard(JSON.stringify(state.lastBatchResults, null, 2));
                 showToast("Все результаты скопированы!", "success");
             }
         });
-
-        // Batch CSV
         els.batchCsvBtn.addEventListener("click", () => {
-            if (state.lastBatchResults) {
-                downloadCSV(state.lastBatchResults.results);
-            }
+            if (state.lastBatchResults) downloadCSV(state.lastBatchResults.results);
         });
 
-        // Export all history
-        els.exportBtn.addEventListener("click", () => {
-            if (state.history.length === 0) {
-                showToast("Нет данных для экспорта", "error");
-                return;
-            }
-            const blob = new Blob(
-                [JSON.stringify(state.history, null, 2)],
-                { type: "application/json" }
-            );
-            downloadBlob(blob, "yarko-ai-history.json");
-            showToast("История экспортирована!", "success");
-        });
-
-        // Clear history
+        // History
         els.clearHistoryBtn.addEventListener("click", () => {
             state.history = [];
             localStorage.removeItem("yarko_history");
@@ -174,33 +222,90 @@
             showToast("История очищена", "info");
         });
 
-        // Keyboard shortcut: Ctrl+Enter to analyze
         els.messageInput.addEventListener("keydown", (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                handleAnalyze();
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") handleAnalyze();
+        });
+
+        // Simulator
+        els.simSendBtn.addEventListener("click", handleSimSend);
+        els.simInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSimSend();
+            }
+        });
+        els.simResetBtn.addEventListener("click", handleSimReset);
+
+        renderHistory();
+        
+        // Initialize tabs positioning after a short delay for layout
+        setTimeout(() => switchMode(state.mode), 100);
+    }
+
+    // ──────────────────────────────────────────
+    // Tabs & Modes
+    // ──────────────────────────────────────────
+    function switchMode(mode) {
+        state.mode = mode;
+        if (els.mobileModeSelect && els.mobileModeSelect.value !== mode) els.mobileModeSelect.value = mode;
+        
+        // Update tabs UI and move the white border indicator
+        els.globalTabs.forEach(t => {
+            t.classList.toggle("active", t.dataset.mode === mode);
+            if (t.dataset.mode === mode) {
+                const indicator = $(".global-tab-indicator");
+                if (indicator) {
+                    indicator.style.width = `${t.offsetWidth}px`;
+                    indicator.style.transform = `translateX(${t.offsetLeft}px)`;
+                }
             }
         });
 
-        renderHistory();
+        if (mode === "simulator") {
+            els.standardModeSection.classList.add("hidden");
+            els.simulatorModeSection.classList.remove("hidden");
+        } else {
+            els.standardModeSection.classList.remove("hidden");
+            els.simulatorModeSection.classList.add("hidden");
+            
+            // Single vs Batch configuration
+            const isBatch = mode === "batch";
+            els.batchHint.classList.toggle("hidden", !isBatch);
+            els.messageInput.placeholder = isBatch ? "Вставьте список сообщений (система разделит их автоматически)" : "Вставьте сообщение туриста...";
+            
+            // Switch back to input when changing mode
+            switchInnerTab("input");
+            els.tabBtnResult.disabled = true;
+            els.backToInputBtn.closest(".back-to-input").classList.add("hidden");
+        }
+        
+        renderHistory(); // Hide history in batch mode
+    }
+
+    function switchInnerTab(tabName) {
+        els.innerTabs.forEach(t => t.classList.toggle("active", t.dataset.tab === tabName));
+        els.tabInput.classList.toggle("active", tabName === "input");
+        els.tabResult.classList.toggle("active", tabName === "result");
+
+        if (tabName === "result") {
+            els.tabBtnResult.disabled = false;
+            els.backToInputBtn.closest(".back-to-input").classList.remove("hidden");
+        }
     }
 
     // ──────────────────────────────────────────
     // Auth
     // ──────────────────────────────────────────
-
     async function handleAuth() {
         const password = els.authPassword.value.trim();
         if (!password) return;
-
         els.authBtn.disabled = true;
-
         try {
             const res = await fetch("/api/auth", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ password }),
             });
-
             if (res.ok) {
                 const data = await res.json();
                 state.token = data.message;
@@ -229,7 +334,6 @@
     // ──────────────────────────────────────────
     // Analyze
     // ──────────────────────────────────────────
-
     async function handleAnalyze() {
         const text = els.messageInput.value.trim();
         if (!text) {
@@ -240,7 +344,7 @@
         setLoading(true);
 
         try {
-            if (state.batchMode) {
+            if (state.mode === "batch") {
                 await handleBatchAnalyze(text);
             } else {
                 await handleSingleAnalyze(text);
@@ -256,38 +360,29 @@
     async function handleSingleAnalyze(text) {
         const res = await apiFetch("/api/analyze", { message: text });
         state.lastResult = res;
-
-        // Add to history
         addToHistory(text, res);
-
-        // Show result
+        
         renderSingleResult(res);
-        els.resultSection.classList.remove("hidden");
-        els.batchResultSection.classList.add("hidden");
-        els.resultSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        els.singleResultContainer.classList.remove("hidden");
+        els.batchResultContainer.classList.add("hidden");
+        
+        switchInnerTab("result");
     }
 
     async function handleBatchAnalyze(text) {
         let messages = [];
 
-        // 1. Умное разделение
         if (/^\s*---\s*$/m.test(text)) {
-            // По дефисам
             messages = text.split(/^\s*---\s*$/m);
         } else if (/\n\s*\n/.test(text)) {
-            // По пустым строкам
             messages = text.split(/\n\s*\n/);
         } else if (/^\s*\d+\.\s/m.test(text)) {
-            // По нумерации "1.", "2."
             messages = text.split(/^\s*\d+\.\s/m);
         } else {
-            // По обычным переносам строк
             messages = text.split('\n');
         }
 
-        messages = messages
-            .map((m) => m.trim())
-            .filter((m) => m.length > 0);
+        messages = messages.map(m => m.trim()).filter(m => m.length > 0);
 
         if (messages.length === 0) {
             showToast("Не найдено сообщений для разбора", "error");
@@ -297,29 +392,89 @@
         const res = await apiFetch("/api/batch", { messages });
         state.lastBatchResults = res;
 
-        // Add each to history
         messages.forEach((msg, i) => {
-            if (res.results[i]) {
-                addToHistory(msg, res.results[i]);
-            }
+            if (res.results[i]) addToHistory(msg, res.results[i]);
         });
 
-        // Show results
         renderBatchResults(res);
-        els.batchResultSection.classList.remove("hidden");
-        els.resultSection.classList.add("hidden");
-        els.batchResultSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        els.singleResultContainer.classList.add("hidden");
+        els.batchResultContainer.classList.remove("hidden");
+        
+        switchInnerTab("result");
+    }
+
+    // ──────────────────────────────────────────
+    // Simulator
+    // ──────────────────────────────────────────
+    async function handleSimSend() {
+        const text = els.simInput.value.trim();
+        if (!text) return;
+        
+        els.simInput.value = "";
+        
+        // Add to history
+        state.simHistory.push({ role: "user", text });
+        renderSimChat();
+        
+        els.simLoading.classList.remove("hidden");
+        
+        try {
+            // Concatenate history for AI
+            const combinedText = state.simHistory.map(msg => `${msg.role === 'user' ? 'Турист' : 'Бот'}: ${msg.text}`).join('\n\n');
+            const res = await apiFetch("/api/analyze", { message: combinedText });
+            
+            if (res.draft_reply) {
+                state.simHistory.push({ role: "bot", text: res.draft_reply });
+                renderSimChat();
+            }
+            
+            els.simCardContent.innerHTML = buildCardHTML(res);
+            if (window.lucide) window.lucide.createIcons();
+            
+        } catch (err) {
+            showToast("Ошибка симулятора: " + (err.message || "Сбой"), "error");
+        } finally {
+            els.simLoading.classList.add("hidden");
+        }
+    }
+    
+    function renderSimChat() {
+        if (state.simHistory.length === 0) {
+            els.simMessages.innerHTML = `
+                <div class="chat-message bot">
+                    <div class="msg-bubble">Отправьте первую реплику туриста, чтобы начать симуляцию сбора данных.</div>
+                </div>
+            `;
+            return;
+        }
+        
+        els.simMessages.innerHTML = state.simHistory.map(msg => `
+            <div class="chat-message ${msg.role}">
+                <div class="msg-bubble">${escapeHtml(msg.text)}</div>
+            </div>
+        `).join("");
+        
+        els.simMessages.scrollTop = els.simMessages.scrollHeight;
+    }
+    
+    function handleSimReset() {
+        state.simHistory = [];
+        renderSimChat();
+        els.simCardContent.innerHTML = `
+            <div class="sim-card-empty">
+                <i data-lucide="layout-template"></i>
+                <p>Карточка сформируется после первого сообщения</p>
+            </div>
+        `;
+        if (window.lucide) window.lucide.createIcons();
     }
 
     // ──────────────────────────────────────────
     // API
     // ──────────────────────────────────────────
-
     async function apiFetch(endpoint, body) {
         const headers = { "Content-Type": "application/json" };
-        if (state.token) {
-            headers["Authorization"] = `Bearer ${state.token}`;
-        }
+        if (state.token) headers["Authorization"] = `Bearer ${state.token}`;
 
         const res = await fetch(endpoint, {
             method: "POST",
@@ -328,46 +483,29 @@
         });
 
         if (res.status === 401) {
-            // Token expired
             state.token = null;
             localStorage.removeItem("yarko_token");
             els.mainScreen.classList.add("hidden");
             els.authScreen.classList.remove("hidden");
             throw new Error("Сессия истекла. Войдите снова.");
         }
-
-        if (res.status === 429) {
-            throw new Error("Слишком много запросов. Подождите минуту.");
-        }
-
+        if (res.status === 429) throw new Error("Слишком много запросов.");
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error(err.detail || `Ошибка ${res.status}`);
         }
-
         return res.json();
     }
 
     // ──────────────────────────────────────────
     // Render: Single Result
     // ──────────────────────────────────────────
-
     function renderSingleResult(result) {
-        // Card view
         els.cardView.innerHTML = buildCardHTML(result);
-
-        // JSON view
-        els.jsonOutput.innerHTML = syntaxHighlight(
-            JSON.stringify(result, null, 2)
-        );
-
-        // Cost
+        els.jsonOutput.innerHTML = syntaxHighlight(JSON.stringify(result, null, 2));
         els.costValue.textContent = `₽${(result.cost_rub || 0).toFixed(4)}`;
         const tokens = result.tokens_used || {};
-        els.costTokens.textContent = tokens.input
-            ? `${tokens.input} → ${tokens.output} токенов`
-            : "";
-            
+        els.costTokens.textContent = tokens.input ? `${tokens.input} → ${tokens.output} токенов` : "";
         if (window.lucide) window.lucide.createIcons();
     }
 
@@ -378,15 +516,9 @@
             общий_вопрос: { class: "question", icon: "help-circle", label: "Общий вопрос" },
             спам: { class: "spam", icon: "shield-alert", label: "Спам" },
         };
-        
         const conf = intentConfig[r.intent] || intentConfig.общий_вопрос;
         const confidencePct = Math.round((r.confidence || 0) * 100);
-        const confidenceColor =
-            confidencePct >= 80
-                ? "var(--intent-tour)"
-                : confidencePct >= 50
-                ? "var(--sentiment-neutral)"
-                : "var(--intent-urgent)";
+        const confidenceColor = confidencePct >= 80 ? "var(--intent-tour)" : confidencePct >= 50 ? "#facc15" : "var(--intent-urgent)";
 
         let html = `
             <div class="intent-header">
@@ -402,7 +534,6 @@
             </div>
         `;
 
-        // Parameters grid
         const params = [];
         if (r.people_count != null) {
             let val = `${r.people_count} чел.`;
@@ -416,20 +547,8 @@
             const per = r.budget_per_person ? "/чел." : "";
             params.push(["wallet", "Бюджет", formatMoney(r.budget_max) + per]);
         }
-        if (r.desired_dates) {
-            params.push(["calendar", "Даты", r.desired_dates]);
-        }
-        if (r.is_urgent) {
-            params.push(["zap", "Срочность", "Да (Высокая)"]);
-        }
-        if (r.sentiment) {
-            const sentIcon = { 
-                позитивный: "smile", 
-                нейтральный: "meh", 
-                негативный: "frown" 
-            };
-            params.push([sentIcon[r.sentiment] || "message-square", "Тон", r.sentiment]);
-        }
+        if (r.desired_dates) params.push(["calendar", "Даты", r.desired_dates]);
+        if (r.is_urgent) params.push(["zap", "Срочность", "Да (Высокая)"]);
 
         if (params.length > 0) {
             html += '<div class="params-grid">';
@@ -444,28 +563,17 @@
             html += "</div>";
         }
 
-        // Tags (destinations + special requests)
-        const tags = [
-            ...(r.destination_preferences || []),
-            ...(r.special_requests || []),
-        ];
+        const tags = [...(r.destination_preferences || []), ...(r.special_requests || [])];
         if (tags.length > 0) {
             html += '<div class="tags-row">';
-            for (const tag of tags) {
-                html += `<span class="tag"><i data-lucide="tag"></i> ${escapeHtml(tag)}</span>`;
-            }
+            for (const tag of tags) html += `<span class="tag"><i data-lucide="tag"></i> ${escapeHtml(tag)}</span>`;
             html += "</div>";
         }
 
-        // Notes
-        if (r.notes) {
-            html += `<div class="notes-box"><i data-lucide="info"></i> <span>${escapeHtml(r.notes)}</span></div>`;
-        }
-
-        // Draft reply
+        if (r.notes) html += `<div class="notes-box mt-4" style="margin-top:16px"><i data-lucide="info"></i> <span>${escapeHtml(r.notes)}</span></div>`;
         if (r.draft_reply) {
             html += `
-                <div class="draft-reply">
+                <div class="draft-reply mt-4" style="margin-top:16px">
                     <div class="draft-reply-label"><i data-lucide="message-circle"></i> Черновик ответа</div>
                     ${escapeHtml(r.draft_reply)}
                 </div>
@@ -478,7 +586,6 @@
     // ──────────────────────────────────────────
     // Render: Batch Results
     // ──────────────────────────────────────────
-
     function renderBatchResults(data) {
         let html = "";
         data.results.forEach((r, i) => {
@@ -496,23 +603,19 @@
             `;
         });
         els.batchResults.innerHTML = html;
+        if (els.batchJsonOutput) els.batchJsonOutput.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
         els.batchCostValue.textContent = `₽${(data.total_cost_rub || 0).toFixed(4)}`;
-        
         if (window.lucide) window.lucide.createIcons();
     }
 
     // ──────────────────────────────────────────
     // History
     // ──────────────────────────────────────────
-
     function addToHistory(message, result) {
         const item = {
             message: message.substring(0, 200),
             result,
-            time: new Date().toLocaleTimeString("ru-RU", {
-                hour: "2-digit",
-                minute: "2-digit",
-            }),
+            time: new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
             timestamp: Date.now(),
         };
         state.history.unshift(item);
@@ -522,7 +625,7 @@
     }
 
     function renderHistory() {
-        if (state.history.length === 0) {
+        if (state.history.length === 0 || state.mode !== "single") {
             els.historySection.classList.add("hidden");
             return;
         }
@@ -546,7 +649,6 @@
         });
         els.historyList.innerHTML = html;
 
-        // Click to view
         els.historyList.querySelectorAll(".history-item").forEach((el) => {
             el.addEventListener("click", () => {
                 const idx = parseInt(el.dataset.index);
@@ -554,9 +656,9 @@
                 if (item) {
                     state.lastResult = item.result;
                     renderSingleResult(item.result);
-                    els.resultSection.classList.remove("hidden");
-                    els.batchResultSection.classList.add("hidden");
-                    els.resultSection.scrollIntoView({ behavior: "smooth" });
+                    els.singleResultContainer.classList.remove("hidden");
+                    els.batchResultContainer.classList.add("hidden");
+                    switchInnerTab("result");
                 }
             });
         });
@@ -567,7 +669,6 @@
     // ──────────────────────────────────────────
     // Export CSV
     // ──────────────────────────────────────────
-
     function downloadCSV(results) {
         const headers = [
             "intent", "confidence", "people_count", "has_children",
@@ -575,7 +676,6 @@
             "destination_preferences", "special_requests",
             "draft_reply", "notes", "cost_rub",
         ];
-
         let csv = headers.join(",") + "\n";
         for (const r of results) {
             const row = headers.map((h) => {
@@ -586,7 +686,6 @@
             });
             csv += row.join(",") + "\n";
         }
-
         const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
         downloadBlob(blob, "yarko-ai-results.csv");
         showToast("CSV скачан!", "success");
@@ -595,7 +694,6 @@
     // ──────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────
-
     function setLoading(loading) {
         els.analyzeBtn.disabled = loading;
         els.btnText.classList.toggle("hidden", loading);
@@ -627,13 +725,9 @@
             /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
             (match) => {
                 let cls = "json-number";
-                if (/^"/.test(match)) {
-                    cls = /:$/.test(match) ? "json-key" : "json-string";
-                } else if (/true|false/.test(match)) {
-                    cls = "json-bool";
-                } else if (/null/.test(match)) {
-                    cls = "json-null";
-                }
+                if (/^"/.test(match)) cls = /:$/.test(match) ? "json-key" : "json-string";
+                else if (/true|false/.test(match)) cls = "json-bool";
+                else if (/null/.test(match)) cls = "json-null";
                 return `<span class="${cls}">${match}</span>`;
             }
         );
@@ -641,7 +735,6 @@
 
     function copyToClipboard(text) {
         navigator.clipboard.writeText(text).catch(() => {
-            // Fallback
             const ta = document.createElement("textarea");
             ta.value = text;
             document.body.appendChild(ta);
@@ -663,24 +756,12 @@
     function showToast(message, type = "success") {
         const toast = document.createElement("div");
         toast.className = `toast ${type}`;
-        
-        const icons = {
-            success: 'check-circle-2',
-            error: 'alert-circle',
-            info: 'info'
-        };
-        
+        const icons = { success: 'check-circle-2', error: 'alert-circle', info: 'info' };
         toast.innerHTML = `<i data-lucide="${icons[type]}"></i> <span>${message}</span>`;
         els.toastContainer.appendChild(toast);
-        
         if (window.lucide) window.lucide.createIcons();
-        
         setTimeout(() => toast.remove(), 2800);
     }
-
-    // ──────────────────────────────────────────
-    // Start
-    // ──────────────────────────────────────────
 
     document.addEventListener("DOMContentLoaded", init);
 })();

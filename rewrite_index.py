@@ -1,92 +1,10 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="description" content="AI-автоматизатор разбора сообщений туристов">
-    <meta name="theme-color" content="#FFFFFF">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>Yarko AI</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css">
-    <script src="https://unpkg.com/lucide@latest"></script>
-</head>
-<body>
-    <!-- Экран авторизации -->
-    <div id="auth-screen" class="screen auth-screen">
-        <div class="auth-card">
-            <div class="hero-badge">
-                <span class="hero-badge-dot"></span>
-                <span>Security</span>
-            </div>
-            <h1 class="hero-title">Welcome back</h1>
-            <p class="subtitle">Please enter your password to continue</p>
-            
-            <div class="auth-form">
-                <input 
-                    type="password" 
-                    id="auth-password" 
-                    class="input auth-input" 
-                    placeholder="Enter password..."
-                    autocomplete="current-password"
-                >
-                <button id="auth-btn" class="btn btn-primary">
-                    Continue
-                </button>
-                <p id="auth-error" class="error-text hidden">
-                    Incorrect password.
-                </p>
-            </div>
-        </div>
-    </div>
+import re
 
-    <!-- Основной экран -->
-    <div id="main-screen" class="screen hidden">
-        <!-- Хедер -->
-        <header class="header">
-            <div class="header-content">
-                <div class="header-left">
-                    <div class="header-logo">
-                        <i data-lucide="sparkles"></i>
-                    </div>
-                    <span class="header-title">Yarko AI</span>
-                </div>
-                <div class="header-right">
-                    <button id="mode-toggle" class="btn-icon" title="Toggle Batch Mode">
-                        <i data-lucide="layers" id="mode-icon"></i>
-                    </button>
-                    <button id="export-btn" class="btn-icon" title="Export Data">
-                        <i data-lucide="download"></i>
-                    </button>
-                </div>
-            </div>
-        </header>
+with open("static/index.html", "r", encoding="utf-8") as f:
+    content = f.read()
 
-        <!-- Контент -->
-        <main class="main-content">
-            
-            <!-- Hero секция -->
-            <section class="hero-section" style="text-align: center; padding-top: 0;">
-                <div class="hero-badge">
-                    <span class="hero-badge-dot"></span>
-                    <span>AI Assistant</span>
-                </div>
-                <h1 class="hero-title">Analyze messages <br/>in seconds.</h1>
-            </section>
-
+new_main = """        <main class="main-content">
             <!-- Глобальные вкладки (Режимы) -->
-
-            <div class="mobile-mode-select-container">
-                <select id="mobile-mode-select" class="input mobile-mode-select">
-                    <option value="single">⚡ Быстрый разбор</option>
-                    <option value="batch">📚 Несколько заявок</option>
-                    <option value="simulator">💬 Симулятор чата</option>
-                </select>
-            </div>
-
             <div class="global-tabs-container">
                 <div class="global-tabs">
                     <button class="global-tab active" data-mode="single">
@@ -164,8 +82,8 @@
                                 </button>
                             </div>
                             <div class="result-body">
-                                <div id="card-view" class="tab-content active"></div>
-                                <div id="json-view" class="tab-content json-wrapper">
+                                <div id="card-view" class="sub-tab-content active"></div>
+                                <div id="json-view" class="sub-tab-content json-wrapper">
                                     <pre><code id="json-output"></code></pre>
                                 </div>
                             </div>
@@ -179,7 +97,7 @@
                         </div>
 
                         <div id="batch-result-container" class="hidden">
-                            <div class="result-header" style="margin-bottom:16px;">
+                            <div class="result-header">
                                 <h2>Результаты</h2>
                                 <div class="result-actions">
                                     <button id="batch-copy-btn" class="btn-icon" title="Copy All">
@@ -190,28 +108,7 @@
                                     </button>
                                 </div>
                             </div>
-                            
-                            <div class="segment-control-wrapper">
-                                <div class="segment-control">
-                                    <button class="segment-btn batch-segment-btn active" data-target="batch-card-view">
-                                        <i data-lucide="layout-template"></i> Карточки
-                                    </button>
-                                    <button class="segment-btn batch-segment-btn" data-target="batch-json-view">
-                                        <i data-lucide="file-json-2"></i> JSON
-                                    </button>
-                                    <div class="segment-indicator batch-segment-indicator"></div>
-                                </div>
-                            </div>
-                            
-                            <div class="result-body">
-                                <div id="batch-card-view" class="tab-content batch-tab-content active">
-                                    <div id="batch-results" class="batch-results"></div>
-                                </div>
-                                <div id="batch-json-view" class="tab-content batch-tab-content json-wrapper">
-                                    <pre><code id="batch-json-output"></code></pre>
-                                </div>
-                            </div>
-
+                            <div id="batch-results" class="batch-results"></div>
                             <div class="cost-bar mt-4">
                                 <div class="cost-left">
                                     <span class="cost-label">Общая стоимость:</span>
@@ -238,11 +135,6 @@
 
             <!-- Режим: Симулятор чата -->
             <section id="simulator-mode-section" class="mode-section hidden">
-                                <!-- Мобильные вкладки симулятора -->
-                <div class="sim-mobile-tabs">
-                    <button class="sim-mobile-tab active" data-tab="chat"><i data-lucide="message-circle"></i> Чат</button>
-                    <button class="sim-mobile-tab" data-tab="card"><i data-lucide="sparkles"></i> Карточка</button>
-                </div>
                 <div class="simulator-layout">
                     <!-- Левая панель: Чат -->
                     <div class="card simulator-chat">
@@ -282,15 +174,13 @@
                     </div>
                 </div>
             </section>
-        </main>
-    </div>
+        </main>"""
 
-    <!-- Уведомления -->
-    <div id="toast-container" class="toast-container"></div>
+start_idx = content.find('<main class="main-content">')
+end_idx = content.find('</main>') + 7
 
-    <script src="/static/app.js"></script>
-    <script>
-        lucide.createIcons();
-    </script>
-</body>
-</html>
+new_content = content[:start_idx] + new_main + content[end_idx:]
+
+with open("static/index.html", "w", encoding="utf-8") as f:
+    f.write(new_content)
+print("Updated index.html")
