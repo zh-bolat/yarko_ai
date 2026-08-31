@@ -96,8 +96,8 @@
             els.batchHint.classList.toggle("hidden", !state.batchMode);
             
             if (state.batchMode) {
-                els.inputTitle.innerHTML = '<i data-lucide="layers"></i> Сообщения (batch)';
-                els.messageInput.placeholder = "Вставьте сообщения, разделяя их строкой ---";
+                els.inputTitle.innerHTML = '<i data-lucide="layers"></i> Несколько заявок';
+                els.messageInput.placeholder = "Вставьте список сообщений (система разделит их автоматически)";
             } else {
                 els.inputTitle.innerHTML = '<i data-lucide="user"></i> Сообщение туриста';
                 els.messageInput.placeholder = "Вставьте сообщение туриста...";
@@ -268,8 +268,24 @@
     }
 
     async function handleBatchAnalyze(text) {
-        const messages = text
-            .split(/^---$/m)
+        let messages = [];
+
+        // 1. Умное разделение
+        if (/^\s*---\s*$/m.test(text)) {
+            // По дефисам
+            messages = text.split(/^\s*---\s*$/m);
+        } else if (/\n\s*\n/.test(text)) {
+            // По пустым строкам
+            messages = text.split(/\n\s*\n/);
+        } else if (/^\s*\d+\.\s/m.test(text)) {
+            // По нумерации "1.", "2."
+            messages = text.split(/^\s*\d+\.\s/m);
+        } else {
+            // По обычным переносам строк
+            messages = text.split('\n');
+        }
+
+        messages = messages
             .map((m) => m.trim())
             .filter((m) => m.length > 0);
 
