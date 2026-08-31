@@ -98,12 +98,14 @@ class GeminiClient:
             temperature=0.7,
         )
 
-        # Используем async client
-        response = await self._client.aio.models.generate_content(
-            model=settings.GEMINI_MODEL,
-            contents=prompt,
-            config=config,
-        )
+        # Используем синхронный клиент через to_thread для безопасности
+        def _sync_call():
+            return self._client.models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=prompt,
+                config=config,
+            )
+        response = await asyncio.to_thread(_sync_call)
         return response.text
 
     async def _call_gemini(
@@ -133,12 +135,16 @@ class GeminiClient:
 
         for attempt in range(max_retries):
             try:
-                # В новом SDK асинхронные вызовы делаются через client.aio.models
-                response = await self._client.aio.models.generate_content(
-                    model=model_name,
-                    contents=message,
-                    config=config,
-                )
+                # Используем синхронный клиент через asyncio.to_thread для 100% стабильности
+                # (в google-genai aio.models иногда зависает при вызове из фоновой задачи)
+                def _sync_call():
+                    return self._client.models.generate_content(
+                        model=model_name,
+                        contents=message,
+                        config=config,
+                    )
+                
+                response = await asyncio.to_thread(_sync_call)
                 return response
             except Exception as e:
                 wait_time = (2 ** attempt) * 0.5  # 0.5s, 1s, 2s

@@ -11,6 +11,7 @@ Telegram-бот — AI-агент для диалога с туристами.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Optional
 
 from telegram import Update
@@ -106,7 +107,19 @@ async def _handle_message(update: Update, context) -> None:
     if not text or not text.strip():
         return
 
+    clean_text = text.strip().lower()
+    # Убираем знаки препинания в конце
+    clean_text = re.sub(r'[!.,?]+$', '', clean_text).strip()
+
     logger.info(f"Message from user {user_id}: {text[:50]}...")
+
+    # Быстрый перехват чистых приветствий
+    greetings = {"привет", "здравствуйте", "добрый день", "доброе утро", "добрый вечер", "здрасти", "здравствуй", "приветствую"}
+    if clean_text in greetings:
+        await update.message.reply_text(
+            "Здравствуйте! 👋 Чем могу вам помочь? (подбор тура, вопросы по бронированию или поддержка в поездке)"
+        )
+        return  # Не отправляем это в нейросеть, экономим токен и время
 
     # Добавляем в буфер с callback на обработку
     await context_manager.add_message(
